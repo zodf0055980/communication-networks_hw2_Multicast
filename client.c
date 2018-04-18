@@ -6,36 +6,52 @@
 #include <string.h>
 #include <netdb.h> 
 #include <time.h>
+#include <unistd.h>
 #define buffersize 100
 
 int main(int argc, char **argv)
 {
-    struct hostent *ip = gethostbyname(argv[1]);
     char buffer[buffersize];
-    char message[] = "end";
-    char get[] = "get";
+    int sockfd;
+    sockfd = socket(AF_INET,SOCK_DGRAM,0);
+    if(sockfd < 0) {
+        perror("Opening datagram socket error");    
+    } 
 
-    int sockfd,cliendfd;
-    sockfd = socket(AF_INET,SOCK_STREAM,0);
+    int a = 1;
+    if (setsockopt(sockfd,SOL_SOCKET,SO_REUSEADDR,(char *)&a,sizeof(a)) <0) {
+        perror("Setting SO_REUSEADDR error");    
+    }
     
 	struct sockaddr_in info;
 	bzero(&info,sizeof(info));
 	info.sin_family=AF_INET;
-    bcopy((char *)ip->h_addr, (char *)&info.sin_addr.s_addr, ip->h_length);
+    info.sin_addr.s_addr = INADDR_ANY;
 	info.sin_port=htons(8080);
 
-    FILE *fp=fopen("new.dat","wb");
+    bind(sockfd,(struct sockaddr*)&info,sizeof(info));
+    // FILE *fp=fopen("new.dat","wb");
 
-    while(1){
-        memset(buffer,0,buffersize);
-        ssize_t by = recvfrom(sockfd, buffer, sizeof(buffer),0,(struct sockaddr *)&info, sizeof(info));
-        if(strcmp(buffer,"end")==0){
-            break;
-        }
-        fwrite(buffer,sizeof(char),by,fp);
-    }
-    
-    fclose(fp);
+    // int loop = 1;
+    // setsockopt(sockfd,IPPROTO_IP,IP_MULTICAST_LOOP,&loop,sizeof(loop));
+
+    struct ip_mreq mreq;
+    mreq.imr_multiaddr.s_addr = inet_addr("226.1.1.1");
+    mreq.imr_interface.s_addr = inet_addr("127.0.0.1");;
+    setsockopt(sockfd,IPPROTO_IP,IP_ADD_MEMBERSHIP,(char *)&mreq,sizeof(mreq));
+
+    memset(buffer,0,buffersize);
+    recvfrom(sockfd, buffer, sizeof(buffer),0,(struct sockaddr *)&info, sizeof(info));
+    printf("get = %s",buffer);
+        // ssize_t by = recvfrom(sockfd, buffer, sizeof(buffer),0,(struct sockaddr *)&info, sizeof(info));
+        // if(strcmp(buffer,"end")==0){
+        //     break;
+        // }
+        // fwrite(buffer,sizeof(char),by,fp);
+ //       sleep(5000);
+        // fclose(fp);
+
+    setsockopt(sockfd,IPPROTO_IP,IP_DROP_MEMBERSHIP,&mreq,sizeof(mreq));
     printf("end\n");
     close(sockfd);
 	return 0;
