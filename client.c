@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
+#include <arpa/inet.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <string.h>
@@ -8,6 +9,8 @@
 #include <time.h>
 #include <unistd.h>
 
+#define localip "127.0.0.1"
+#define multicastip "226.1.1.1"
 #define buffersize 256
 #define hambuffersize 384
 
@@ -42,34 +45,38 @@ int main(int argc, char **argv)
     bind(sockfd,(struct sockaddr*)&info,sizeof(info));
 
     struct ip_mreq lmreq;
-    lmreq.imr_multiaddr.s_addr = inet_addr("226.1.1.1");
-    lmreq.imr_interface.s_addr = inet_addr("127.0.0.1");;
+    lmreq.imr_multiaddr.s_addr = inet_addr(multicastip);
+    lmreq.imr_interface.s_addr = inet_addr(localip);;
     setsockopt(sockfd,IPPROTO_IP,IP_ADD_MEMBERSHIP,(char *)&lmreq,sizeof(lmreq));
 
     memset(buffer,0,buffersize);
     recvfrom(sockfd, buffer, sizeof(buffer),0,(struct sockaddr *)&info, sizeof(info));
-    printf("get = %s\n",buffer);
 
     FILE *filep=fopen("new.jpg","wb");
     int byte;
+    float get=0;
     while(1) {
         memset(buffer,0,buffersize);
         memset(hambuffer,'\0',hambuffersize);
-        // ssize_t n = read(sockfd,buffer,sizeof(buffer));
         size_t n = read(sockfd,hambuffer,sizeof(hambuffer));
         if(strcmp(hambuffer,"end")==0){
-            printf("get end");
            break;
+        }else{
+            get++;
         }
         byte=hamdecode(buffer,hambuffer,n);
         fwrite(buffer,sizeof(char),byte,filep);
-        printf("byte = %d\n",byte);
-        // fwrite(buffer,sizeof(char),n,filep);
     }
+
+    memset(buffer,'\0',buffersize);
+    read(sockfd,buffer,sizeof(buffer));
+    float allp = atof(buffer);
+    float rate = (allp-get)/allp;
+    printf("get = %f , all = %f , UDP loss rate = %f\n",get,allp,rate);
+
 
     fclose(filep);
     setsockopt(sockfd,IPPROTO_IP,IP_DROP_MEMBERSHIP,&lmreq,sizeof(lmreq));
-    printf("end\n");
     close(sockfd);
 	return 0;
 }
@@ -85,58 +92,34 @@ int hamdecode(char *buf,char *hbuf,long sz) {
     int ori=0;
     for(l=0;l<(sz-unde);l+=3) {
         q = 0x00;
-        // printf("a1 = ");
         for(i = 0x80; i>0 ; i>>=1) {
             if(*(hbuf+ham) & i) {
                 q = q ^ max[j];
-            //    printf("1");
-            } //else
-            //    printf("0");
+            }
             j++;
         }
-
-        // printf("\na2 = ");
 
         for(i = 0x80; i>0 ; i>>=1) {
             if(*(hbuf+ham+1) & i) {
                 q = q ^ max[j];
-                // printf("1");
-            } //else
-                // printf("0");
+            }
             j++;
         }
-
         j=0;
-        // printf("\nham = ");
         for(i = 0x01; i<0x11 ; i<<=1) {
             if(*(hbuf+ham+2) & i) {
                 q = q ^ hammat[j];
-                // printf("1");
-            } //else
-                // printf("0");
+            } 
             j++;
         }
-        
-        // printf("\nq = ");
         j=0;
-        // for(i = 0x80; i>0 ; i>>=1) {
-        //     if(q & i) {
-        //         printf("1");
-        //     } else
-        //         printf("0");
-        // }
-
-
+ 
         char dd;
         if(q<=0x0c && q>0x00){
-            // printf("\na1 error\n");
             *(hbuf+ham) = *(hbuf+ham)^correct[q];
         } else if (q>0x0c) {
-            // printf("\na2 error\n");
             *(hbuf+ham+1) = *(hbuf+ham+1)^correct[q];
         } 
-        // else
-        //     printf("\nall corect\n");
 
         *(buf+ori)=*(hbuf+ham);
         ori++;
@@ -147,7 +130,6 @@ int hamdecode(char *buf,char *hbuf,long sz) {
     }
 
     if(unde){
-        // printf("\not decode\n");
         *(buf+ori)=*(hbuf+ham);
         ori++;
         ham++;

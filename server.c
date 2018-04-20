@@ -5,7 +5,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
+#define localip "127.0.0.1"
+#define multicastip "226.1.1.1"
 #define buffersize 256
 #define hambuffersize 384
 
@@ -30,10 +31,10 @@ int main (int argc, char **argv)
 	 
 	memset((char *) &groupSock, 0, sizeof(groupSock));
 	groupSock.sin_family = AF_INET;
-	groupSock.sin_addr.s_addr = inet_addr("226.1.1.1");
+	groupSock.sin_addr.s_addr = inet_addr(multicastip);
 	groupSock.sin_port = htons(8080);
 	
-	localInterface.s_addr = inet_addr("127.0.0.1");
+	localInterface.s_addr = inet_addr(localip);
 	if(setsockopt(sockfd, IPPROTO_IP, IP_MULTICAST_IF, (char *)&localInterface, sizeof(localInterface)) < 0)
 	{
 	  perror("set interface error");
@@ -48,15 +49,17 @@ int main (int argc, char **argv)
 	char message[] = "end";
     int rb;
 	int hamb;
+	int sendcount = 0;
     while(rb=fread(buffer,sizeof(char),sizeof(buffer),fp)) {
         hamb=hamencode(buffer,hambuffer,rb);
-		printf("hamb = %d\n",hamb);
 		sendto(sockfd, hambuffer, hamb, 0, (struct sockaddr*)&groupSock, sizeof(groupSock));
-        // sendto(sockfd, buffer, rb , 0, (struct sockaddr*)&groupSock, sizeof(groupSock));
         memset(buffer,0,buffersize);
         memset(hambuffer,'\0',hambuffersize);
+		sendcount++;
     }
+	sprintf(buffer,"%d",sendcount);
     sendto(sockfd, message, sizeof(message), 0, (struct sockaddr*)&groupSock, sizeof(groupSock));
+    sendto(sockfd, buffer, sizeof(buffersize), 0, (struct sockaddr*)&groupSock, sizeof(groupSock));
 
     fclose(fp);
 	return 0;
@@ -73,14 +76,10 @@ int hamencode(char *buf,char *hbuf,long sz) {
 	for(l=0;l<(sz-unham);l+=2) {
 		q = 0x00;
 		j=0;
-		// printf("a1 == ");
 		for(i = 0x80; i>0 ; i>>=1) {
 			if(*(buf+ori) & i) {
 				q = q ^ max[j];
-				// printf("1");
 			} 
-			// else
-			// 	printf("0");
 			j++;
 		}
 
@@ -88,26 +87,12 @@ int hamencode(char *buf,char *hbuf,long sz) {
 		ham++;
 		ori++;
 
-		// printf("\na2 == ");
 		for(i = 0x80; i>0 ; i>>=1) {
 			if (*(buf+ori) & i) {
 				q = q ^ max[j];
-				// printf("1");
 			} 
-			// else
-			// 	printf("0");
 			j++;
 		}
-		// printf("\nj=%d",j);
-		// printf("\nha == ");
-    	// for(i = 0x01; i<0x11 ; i<<=1) {
-        //     if(q & i) {
-        //         printf("1");
-        //     } else
-        //         printf("0");
-        // }
-        
-		// printf("\n");
 
 		*(hbuf+ham)=*(buf+ori);
 		ham++;
@@ -116,7 +101,6 @@ int hamencode(char *buf,char *hbuf,long sz) {
 		ham++;
 	}
 	if(unham) {
-			// printf("\nnot do ham\n");
 			*(hbuf+ham)=*(buf+ori);
 			ham++;
 	}
