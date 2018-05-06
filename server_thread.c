@@ -10,15 +10,29 @@
 
 #define buffersize 256
 #define hambuffersize 384
-
+int threadnum[7];
 char max[]={0x03,0x05,0x06,0x07,0x09,0x0a,0x0b,0x0c,0x0d,0x0e,0x0f,0x11,0x12,0x13,0x14,0x15};
+
 void *sender(void *);
+
 int hamencode(char *,char *,long);
-char *path;
+
+struct sockthread{
+    pthread_t thread;
+    int value;
+    int sock;
+    char *path;
+};
+
+struct sockthread thread_id[7];
+int threadnum[7];
+
 int main (int argc, char **argv)
 {
-    path = argv[1];
-    pthread_t thread_id;
+    int i;
+    for(i=0;i<7;i++) {
+        threadnum[i]=0;
+    }
     int sockfd,clientfd;
     sockfd = socket(AF_INET,SOCK_STREAM,0);
 	struct sockaddr_in serverinfo,clientinfo;
@@ -30,16 +44,27 @@ int main (int argc, char **argv)
 
 	listen(sockfd,7);
 	socklen_t clen;
+
     while(clientfd=accept(sockfd,(struct sockaddr*)&clientinfo,&clen)){
-        pthread_create(&thread_id,NULL,sender,(void*) &clientfd);
-        pthread_join( thread_id , NULL);
+        int now=0;
+        while(threadnum[now]==1) {
+            now=(now+1)%7;
+        }
+        threadnum[now] = 1;
+        thread_id[now].sock = clientfd;
+        thread_id[now].path = argv[1];
+        thread_id[now].value = now;
+        // printf("pid=%d",now);
+        // fflush(stdout);
+        pthread_create(&(thread_id[now].thread),NULL,sender,(void*) &thread_id[now]);
     }
 	return 0;
 }
 
-void *sender(void *socket_desc) {
-    int sock = *(int*)socket_desc;
-    FILE *fp=fopen(path,"rb");
+void *sender(void *data) {
+    struct sockthread *nowthread = (struct sockthread *)data;
+    int sock = nowthread->sock;
+    FILE *fp=fopen(nowthread->path,"rb");
     char buffer[buffersize];
     char hambuffer[hambuffersize];
 	char message[] = "end";
@@ -56,6 +81,7 @@ void *sender(void *socket_desc) {
     }
     send(sock, message, sizeof(message), 0);
     fclose(fp);
+    threadnum[nowthread->value]=0;
 }
 
 int hamencode(char *buf,char *hbuf,long sz) {
