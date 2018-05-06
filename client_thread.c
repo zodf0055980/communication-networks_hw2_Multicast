@@ -8,7 +8,6 @@
 #include <netdb.h> 
 #include <time.h>
 #include <unistd.h>
-
 #define localip "127.0.0.1"
 #define buffersize 256
 #define hambuffersize 384

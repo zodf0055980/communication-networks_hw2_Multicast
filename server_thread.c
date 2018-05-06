@@ -17,7 +17,7 @@ int hamencode(char *,char *,long);
 char *path;
 int main (int argc, char **argv)
 {
-    char *path = argv[1];
+    path = argv[1];
     pthread_t thread_id;
     int sockfd,clientfd;
     sockfd = socket(AF_INET,SOCK_STREAM,0);
