@@ -13,8 +13,8 @@ $ ./server pass_filename
 ## multicast
 change the client_thread.c #define localip.
 ```
-$ gcc -o server server.c -lpthread
-$ gcc -o client client.c
+$ gcc -o server serve_threadr.c -lpthread
+$ gcc -o client client_thread.c
 $ ./server pass_filename
 $ ./client
 ```
